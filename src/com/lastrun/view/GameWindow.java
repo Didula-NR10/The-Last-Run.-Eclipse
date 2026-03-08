@@ -9,27 +9,31 @@ import java.net.URL;
 import java.io.*;
 import java.net.HttpURLConnection;
 import javax.imageio.ImageIO;
+import com.lastrun.model.DatabaseManager; // Import your DB manager
 
 /**
  * The Last Run: Top-Down Survival Edition
- * Features: 4-way movement, Wall Collision, Monster AI, 
- * Multi-colored items, Real-time Stopwatch, and Heart Game API.
  */
 public class GameWindow extends JFrame implements ActionListener, KeyListener {
+    // 1. Database and User Info
     private String username;
+    private DatabaseManager db = new DatabaseManager(); 
+    
+    // 2. Timers
     private Timer gameTimer;   // For movement and physics (20ms)
     private Timer clockTimer;  // For the stopwatch (1000ms)
     
-    // Player and Monster Settings
+    // 3. Player and Monster Settings
     private int playerX = 400, playerY = 300, pSize = 30;
     private int monsterX = 50, monsterY = 50, mSize = 40;
     private int stoneX, stoneY;
     private Color currentStoneColor;
     
-    // Stats
+    // 4. Stats
     private int stonesCollected = 0;
     private int secondsElapsed = 0;
     
+    // 5. Game Objects
     private List<Rectangle> obstacles = new ArrayList<>();
     private boolean[] keys = new boolean[256];
     
@@ -37,7 +41,7 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener {
         Color.RED, Color.GREEN, Color.BLUE, 
         Color.ORANGE, Color.YELLOW, new Color(128, 0, 128) // Purple
     };
-
+    
     public GameWindow(String username) {
         this.username = username;
         setTitle("The Last Run: Survival Mode - " + username);
@@ -83,12 +87,10 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener {
             stoneY = (int) (Math.random() * 450) + 50;
         } while (isColliding(stoneX, stoneY, 25, 25));
 
-        // WEIGHTED RANDOM: 40% chance for Red, 60% divided among others
         int chance = (int)(Math.random() * 100); 
         if (chance < 40) {
-            currentStoneColor = Color.RED; // High chance for Red
+            currentStoneColor = Color.RED; 
         } else {
-            // Pick any other color from the rest of the list
             currentStoneColor = colors[(int)(Math.random() * (colors.length - 1)) + 1];
         }
     }
@@ -149,7 +151,7 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener {
         if (!isColliding(nextX, playerY, pSize, pSize)) playerX = nextX;
         if (!isColliding(playerX, nextY, pSize, pSize)) playerY = nextY;
 
-        // Monster AI with obstacle detection
+        // Monster AI
         int mNextX = monsterX, mNextY = monsterY;
         if (monsterX < playerX) mNextX += 2; else if (monsterX > playerX) mNextX -= 2;
         if (monsterY < playerY) mNextY += 2; else if (monsterY > playerY) mNextY -= 2;
@@ -162,7 +164,7 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener {
         if (pRect.intersects(new Rectangle(stoneX, stoneY, 25, 25))) {
             if (currentStoneColor == Color.RED) {
                 gameTimer.stop();
-                clockTimer.stop(); // Stop the clock during the puzzle
+                clockTimer.stop(); 
                 new Thread(this::triggerHeartPuzzle).start();
             } else {
                 stonesCollected++;
@@ -172,8 +174,6 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener {
 
         // Caught Logic
         if (pRect.intersects(new Rectangle(monsterX, monsterY, mSize, mSize))) {
-            gameTimer.stop();
-            clockTimer.stop();
             handleGameOver("The creature caught you after " + secondsElapsed + " seconds!");
         }
         repaint();
@@ -204,10 +204,6 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener {
                     if (input != null && input.toString().equals(correctAns)) {
                         JOptionPane.showMessageDialog(this, "Correct!");
                         stonesCollected++;
-                        
-                        // REMOVED: monsterX = 50; monsterY = 50; 
-                        // The monster stays exactly where it was.
-                        
                         spawnStone();
                         gameTimer.start();
                         clockTimer.start(); 
@@ -223,31 +219,22 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener {
     }
 
     private void handleGameOver(String message) {
-        int choice = JOptionPane.showConfirmDialog(this, 
-            message + "\nWould you like to retry?", "GAME OVER", 
-            JOptionPane.YES_NO_OPTION);
+        gameTimer.stop();
+        clockTimer.stop();
         
-        if (choice == JOptionPane.YES_OPTION) {
-            resetGame();
-        } else {
-            this.dispose();
-            new Dashboard(username);
-        }
-    }
+        // Save score using the 'db' variable defined at the top
+        db.saveScore(username, stonesCollected, secondsElapsed);
 
-    private void resetGame() {
-        playerX = 400; playerY = 300;
-        monsterX = 50; monsterY = 50;
-        stonesCollected = 0;
-        secondsElapsed = 0;
+        String summary = "--- SESSION SUMMARY ---\n" +
+                         "Status: " + message + "\n" +
+                         "Stones Collected: " + stonesCollected + "\n" +
+                         "Time Survived: " + secondsElapsed + " seconds\n\n" +
+                         "Your score has been uploaded to the leaderboard.";
+        
+        JOptionPane.showMessageDialog(this, summary, "THE LAST RUN - RESULTS", JOptionPane.INFORMATION_MESSAGE);
 
-        for (int i = 0; i < keys.length; i++) keys[i] = false;
-
-        spawnStone();
-        this.requestFocusInWindow();
-        gameTimer.start();
-        clockTimer.start();
-        repaint();
+        this.dispose();
+        new Dashboard(username);
     }
 
     @Override
@@ -262,5 +249,6 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener {
         if (code >= 0 && code < keys.length) keys[code] = false;
     }
 
+    @Override
     public void keyTyped(KeyEvent e) {}
 }

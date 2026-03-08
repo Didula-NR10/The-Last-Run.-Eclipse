@@ -1,8 +1,8 @@
 package com.lastrun.view;
+
 import javax.swing.*;
-
+import javax.swing.table.DefaultTableModel;
 import com.lastrun.model.DatabaseManager;
-
 import java.awt.*;
 
 public class Dashboard extends JFrame {
@@ -10,6 +10,9 @@ public class Dashboard extends JFrame {
     private CardLayout cardLayout = new CardLayout();
     private JPanel contentPanel = new JPanel(cardLayout);
     private DatabaseManager db = new DatabaseManager();
+    
+    // We define the table here so we can update its data later
+    private JTable scoreTable = new JTable();
 
     public Dashboard(String username) {
         this.username = username;
@@ -18,9 +21,9 @@ public class Dashboard extends JFrame {
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
 
-        // 1. Create Navigation Bar (The Side/Top Menu)
+        // 1. Create Navigation Bar
         JPanel navBar = new JPanel(new GridLayout(1, 4, 10, 0));
-        navBar.setBackground(new Color(44, 62, 80)); // Dark professional color
+        navBar.setBackground(new Color(44, 62, 80));
 
         JButton btnStart = createNavButton("Start Game");
         JButton btnScores = createNavButton("Highest Scores");
@@ -37,13 +40,18 @@ public class Dashboard extends JFrame {
         contentPanel.add(createScorePanel(), "scores");
         contentPanel.add(createProfilePanel(), "profile");
 
-        // 3. Button Events (Event-Driven Programming)
+        // 3. Button Events
         btnStart.addActionListener(e -> {
             this.dispose(); 
-            new GameWindow(username); // Launch the runner
+            new GameWindow(username); 
         });
         
-        btnScores.addActionListener(e -> cardLayout.show(contentPanel, "scores"));
+        btnScores.addActionListener(e -> {
+            // REFRESH DATA: Every time the button is clicked, fetch new scores
+            scoreTable.setModel(db.getScoresTableModel());
+            cardLayout.show(contentPanel, "scores");
+        });
+
         btnProfile.addActionListener(e -> cardLayout.show(contentPanel, "profile"));
         
         btnLogout.addActionListener(e -> {
@@ -51,7 +59,6 @@ public class Dashboard extends JFrame {
             new AuthWindow();
         });
 
-        // Add components to JFrame
         add(navBar, BorderLayout.NORTH);
         add(contentPanel, BorderLayout.CENTER);
 
@@ -71,7 +78,9 @@ public class Dashboard extends JFrame {
 
     private JPanel createHomePanel() {
         JPanel panel = new JPanel(new GridBagLayout());
-        panel.add(new JLabel("Welcome back, " + username + "! Ready for the Last Run?"));
+        JLabel welcomeLabel = new JLabel("Welcome back, " + username + "!");
+        welcomeLabel.setFont(new Font("Arial", Font.BOLD, 24));
+        panel.add(welcomeLabel);
         return panel;
     }
 
@@ -82,9 +91,9 @@ public class Dashboard extends JFrame {
         JLabel nameLabel = new JLabel("User Name: " + username);
         nameLabel.setFont(new Font("Arial", Font.BOLD, 18));
         
-        // Fetch current bio from DB
         String currentBio = db.getUserBio(username); 
         JTextArea bioArea = new JTextArea(currentBio);
+        bioArea.setLineWrap(true);
         JButton saveBtn = new JButton("Update Bio");
 
         panel.add(nameLabel);
@@ -101,12 +110,23 @@ public class Dashboard extends JFrame {
     }
 
     private JPanel createScorePanel() {
-        JPanel panel = new JPanel(new BorderLayout());
-        JLabel label = new JLabel("Global Leaderboard (Shortest Time)", SwingConstants.CENTER);
-        label.setFont(new Font("Arial", Font.BOLD, 20));
-        panel.add(label, BorderLayout.NORTH);
+        JPanel panel = new JPanel(new BorderLayout(10, 10));
+        panel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
 
-        // You could use a JTable here later to show all top scores from DB
+        JLabel titleLabel = new JLabel("🏆 Global Leaderboard (Top 10 Survivors)", SwingConstants.CENTER);
+        titleLabel.setFont(new Font("Arial", Font.BOLD, 22));
+        panel.add(titleLabel, BorderLayout.NORTH);
+
+        // Styling the table for a professional look
+        scoreTable.setRowHeight(30);
+        scoreTable.setFont(new Font("Arial", Font.PLAIN, 14));
+        scoreTable.getTableHeader().setFont(new Font("Arial", Font.BOLD, 14));
+        scoreTable.setFillsViewportHeight(true);
+        scoreTable.setEnabled(false); // Make it read-only
+
+        JScrollPane scrollPane = new JScrollPane(scoreTable);
+        panel.add(scrollPane, BorderLayout.CENTER);
+
         return panel;
     }
 }
